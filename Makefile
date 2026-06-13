@@ -1,5 +1,5 @@
 .PHONY: test test-polymlb test-mlton test-cmdline-interface
-LIBDIR := lib/github.com/pzel/assert-polyml
+LIBDIR := lib/github.com/pzel/assert
 
 test: test-polymlb test-mlton test-cmdline-interface
 

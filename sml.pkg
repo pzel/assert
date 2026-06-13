@@ -1,4 +1,4 @@
-package github.com/pzel/assert-polyml
+package github.com/pzel/assert
 
 require {
 }

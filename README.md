@@ -48,7 +48,7 @@ fun iffy (l: int list) : int = hd(tl(l));
 package github.com/you/your-project
 
 require {
-    github.com/pzel/assert-polyml 0.9.0
+    github.com/pzel/assert 0.9.1
 }
 ```
 
@@ -58,7 +58,7 @@ require {
 ```sml
 (* file: runtests.mlb *)
 $(SML_LIB)/basis/basis.mlb
-./lib/github.com/pzel/assert-polyml/assert.mlb (* this library *)
+./lib/github.com/pzel/assert/assert.mlb (* this library *)
 ./mysystem.sml (* your system under test *)
 ./runtests.sml (* your test runner *)
 ```
@@ -168,7 +168,7 @@ First, let's add the Poly/ML basis to our runtests mlb file, and use
 (* file: runtests.mlb *)
 $(SML_LIB)/basis/basis.mlb
 $(SML_LIB)/basis/poly.mlb (* new addition *)
-./lib/github.com/pzel/assert-polyml/assert.mlb
+./lib/github.com/pzel/assert/assert.mlb
 ./mysystem.sml
 ./runtests.sml
 ```

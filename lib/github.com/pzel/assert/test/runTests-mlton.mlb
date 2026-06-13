@@ -1,6 +1,5 @@
 (* basis *)
 $(SML_LIB)/basis/basis.mlb
-(* $(SML_LIB)/basis/poly.mlb *)
 
 (* SUT *)
 ../assert.mlb
