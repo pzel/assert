@@ -291,7 +291,7 @@ TESTS FAILED: 1/2
 #### `--exclude` SUBSTRING
 
 Remove test cases whose name contains SUBSTRING from the set of tests given to
-`runTestsWith`. This also automatically enables the `--verbose` option.
+`runTestsWith`.
 
 ```shell
 % ./runtests --exclude numbers
