@@ -103,11 +103,11 @@ TESTS FAILED: 1/1
 
 ### 5: Run your tests and get some output, too
 
-This library used to only target Poly/ML and rely on Poly/ML's magical
+This library used to only target Poly/ML and relied on Poly/ML's magical
 polymorphic runtime printing facilities. Unfortunately (for this library), the
 Poly/ML runtime no longer carries type information on values, so the
-pretty-printing doesn't work, unless we explicitly guide it as to the types
-it's supposed to print.
+pretty-printing doesn't work, unless we explicitly guide it, at compile-time,
+as to the types it's supposed to print.
 
 First, let's try to fix the output using Standard SML facilities:
 
@@ -127,7 +127,7 @@ val _ = main();
 ```
 
 As you can see, we're overriding the `==` operator with the result of a partial
-application of Assert.eq. We provide `Assert.eq` with a printer for `int`
+application of Assert.eq. We provide `Assert.eq` with a stringifer for `int`
 results, and get back a `==` assertion operator on ints, which will print them
 nicely.
 
@@ -173,9 +173,10 @@ $(SML_LIB)/basis/poly.mlb (* new addition *)
 ./runtests.sml
 ```
 
-
 And now, wherever we partially apply `Assert.eq` to get a specifically-typed
-assertion operator, we simply plug in `PolyML.makestring`. Type inference will do it's job and the generated operator will be specialized to our type. `int`s in our case here:
+assertion operator, we simply plug in `PolyML.makestring`. Type inference will
+do its job and the generated operator will be specialized to our type. `int`s
+in this case here:
 
 ```sml
 local
@@ -289,9 +290,8 @@ TESTS FAILED: 1/2
 
 #### `--exclude` SUBSTRING
 
-Remove test cases whose name contains SUBSTRING are from the set of tests
-given to `runTestsWith`. This also automatically enables the `--verbose`
-option.
+Remove test cases whose name contains SUBSTRING from the set of tests given to
+`runTestsWith`. This also automatically enables the `--verbose` option.
 
 ```shell
 % ./runtests --exclude numbers
