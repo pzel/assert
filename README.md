@@ -1,5 +1,5 @@
-Assert: An ergonomic testing library for Poly/ML
-================================================
+Assert: An ergonomic testing library for Standard ML
+====================================================
 
 ```
 signature ASSERT = sig
@@ -12,62 +12,313 @@ signature ASSERT = sig
   val succeed : string -> raisesTestExn;
   val fail : string -> raisesTestExn;
   val == : (''a * ''a) -> raisesTestExn;
+  val eq : (''a -> string) -> (''a * ''a) -> raisesTestExn;
+
   val =/= : (''a * ''a) -> raisesTestExn;
+  val neq : (''a -> string) -> (''a * ''a) -> raisesTestExn;
+
   val != : (exn * (unit -> 'z)) -> raisesTestExn;
   val =?= : (''a * ''a) -> ''a;
+
   val runTest : tcase -> testresult;
   val runTests : tcase list -> unit;
+  val runTestsWith : tcase list -> string list -> unit;
 end
 ```
 
 ___________________________________________________
 
-TLDR: How to use this
----------------------
+TLDR: How to use this library (via smlpkg + MLB)
+------------------------------------------------
 
-### 1: Include the file [assert.sml](assert.sml) in your project.
+### 0: Have something you want to test
+
+```sml
+(* file: mysystem.sml *)
+fun adder (x: int, y: int) : int = x + y;
+fun welcomer (name: string) : string = "hello, " ^ name;
+fun iffy (l: int list) : int = hd(tl(l));
 
 ```
-use "assert";
+
+
+### 1: Add this library to your `sml.pkg` dependencies
+
+```
+package github.com/you/your-project
+
+require {
+    github.com/pzel/assert-polyml 0.9.0
+}
 ```
 
-### 2: Open the `Assert` module and declare the fixity of the assertion functions.
 
+### 2: Load up the assert mlb file in your test runner mlb
+
+```sml
+(* file: runtests.mlb *)
+$(SML_LIB)/basis/basis.mlb
+./lib/github.com/pzel/assert-polyml/assert.mlb (* this library *)
+./mysystem.sml (* your system under test *)
+./runtests.sml (* your test runner *)
 ```
-open Assert;
-infixr 2 == != =/= =?=;
-```
+
+
 
 ### 3: Write some tests.
 
+```sml
+(* file: runtests.sml *)
+val adderTests = [
+  It "Adds two numbers" (fn _=> adder(2,2) == 3)
+]
+
+fun main () =
+    runTestsWith adderTests (CommandLine.arguments());
+
+val _ = main();
+
 ```
-val myTests = [
-  It "adds integers" (fn() => 2 + 2 == 5),
-  It "concatenates strings" (fn() => "foo" ^ "bar" == "foolbar"),
-  It "raises Subscript" (fn()=> Subscript != (fn() => String.sub("hello", 1)))
-];
-```
 
-### 4: Run your tests and exit the process with a POSIX error code.
-
-```
-> runTests myTests;
-
-FAILED adds integers
-	4 <> 5
-
-FAILED concatenates strings
-	"foobar" <> "foolbar"
-
-FAILED raises Subscript
-	Subscript <> ~ran successfully~
+The function `runTestsWith <list of test cases> <list of parameters>`
+is responsible for conducting and exiting the entire test run. Let's
+see how it works.
 
 
-TESTS FAILED: 3/3
+### 4: Run your tests
 
-$ echo $?
+```shell
+% mlton -output runtests ./runtests.mlb  && ./runtests
+
+FAILED Adds two numbers
+	left:  ?
+	right: ?
+
+
+TESTS FAILED: 1/1
+
+% echo $?
 1
 ```
+
+### 5: Run your tests and get some output, too
+
+This library used to only target Poly/ML and rely on Poly/ML's magical
+polymorphic runtime printing facilities. Unfortunately (for this library), the
+Poly/ML runtime no longer carries type information on values, so the
+pretty-printing doesn't work, unless we explicitly guide it as to the types
+it's supposed to print.
+
+First, let's try to fix the output using Standard SML facilities:
+
+```sml
+local
+  val op == = Assert.eq Int.toString
+in
+val adderTests = [
+  It "Adds two numbers" (fn _=> adder(2,2) == 3)
+]
+end
+
+fun main () =
+    runTestsWith adderTests (CommandLine.arguments());
+
+val _ = main();
+```
+
+As you can see, we're overriding the `==` operator with the result of a partial
+application of Assert.eq. We provide `Assert.eq` with a printer for `int`
+results, and get back a `==` assertion operator on ints, which will print them
+nicely.
+
+```shell
+% mlton -output runtests ./runtests.mlb  && ./runtests
+
+FAILED Adds two numbers
+	left:  4
+	right: 3
+
+
+TESTS FAILED: 1/1
+
+```
+
+Now, we can tell that the error is in our test case, not the system under test.
+When we fix it, we get:
+
+
+```shell
+% mlton -output runtests ./runtests.mlb  && ./runtests
+ALL TESTS PASSED: 1/1
+% echo $?
+0
+```
+
+
+### 6: For Poly/ML Users: Reclaim `Poly.makestring`
+
+Although Poly/ML can't magically select a pretty-printer for any random type at
+runtime, it still knows how to print `*anything*`. We just need to inform it
+what the type of that anything is.
+
+First, let's add the Poly/ML basis to our runtests mlb file, and use
+[polymlb](github.com/vqns/polymlb) build it.
+
+```sml
+(* file: runtests.mlb *)
+$(SML_LIB)/basis/basis.mlb
+$(SML_LIB)/basis/poly.mlb (* new addition *)
+./lib/github.com/pzel/assert-polyml/assert.mlb
+./mysystem.sml
+./runtests.sml
+```
+
+
+And now, wherever we partially apply `Assert.eq` to get a specifically-typed
+assertion operator, we simply plug in `PolyML.makestring`. Type inference will do it's job and the generated operator will be specialized to our type. `int`s in our case here:
+
+```sml
+local
+  val op == = Assert.eq PolyML.makestring
+in
+val adderTests = [
+  It "Adds two numbers" (fn _=> adder(2,2) == 3)
+]
+end
+
+fun main () =
+    runTestsWith adderTests (CommandLine.arguments());
+
+```
+
+```
+% polymlb -output runtests ./runtests.mlb  && ./runtests
+
+FAILED Adds two numbers
+	left:  4
+	right: 3
+
+TESTS FAILED: 1/1
+```
+
+Of course, we are free to specialize the operator to more involved types, such
+as records.
+
+```
+local
+  val op == = Assert.eq PolyML.makestring
+in
+val tests = [
+  It "can display records too" (fn _=> {a=1, b=2} == {a=2, b=4})
+]
+end
+
+fun main () =
+    runTestsWith tests (CommandLine.arguments());
+
+```
+
+
+```shell
+% ./runtests
+
+FAILED can display records too
+	left:  {a = 1, b = 2}
+	right: {a = 2, b = 4}
+
+
+TESTS FAILED: 1/1
+````
+
+
+___________________________________________________
+
+Command-line Arguments
+----------------------
+
+`runTestsWith` takes two parameters: a list of test cases and a raw list
+of command-line parameters, such as that returned from the Basis function
+`CommandLine.arguments ()`.
+
+The following arguments are recognized:
+
+### `--verbose`
+
+Print out all test comparisons, both in successful tests and in failed tests.
+
+```shell
+
+% ./yourTestRunner --verbose
+
+
+OK Adds two numbers
+	left:  4
+	right: 4
+
+FAILED Adds negative numbers
+	left:  0
+	right: 10
+
+ERROR Adds zeroes
+	exception Empty
+
+
+TESTS FAILED: 2/3
+```
+
+### `--filter` SUBSTRING
+
+Only run test cases whose name contains SUBSTRING. Using this flag
+automatically enables the `--verbose` option.
+
+```shell
+% ./runtests --filter numbers
+
+OK Adds two numbers
+	left:  4
+	right: 4
+
+FAILED Adds negative numbers
+	left:  0
+	right: 10
+
+
+TESTS FAILED: 1/2
+```
+
+
+#### `--exclude` SUBSTRING
+
+Remove test cases whose name contains SUBSTRING are from the set of tests
+given to `runTestsWith`. This also automatically enables the `--verbose`
+option.
+
+```shell
+% ./runtests --exclude numbers
+
+ERROR Adds zeroes
+	exception Empty
+
+
+TESTS FAILED: 1/1
+```
+
+#### `--filter` SUBSTRING1 `--exclude` SUBSTRING2
+
+If both the `--filter` and `--exclude` flags are used, the filter logic is
+applied first, and subsequently, cases matching SUBSTRING2 are excluded from
+the cases matching SUBSTRING1. I.e. exclude(SUBSTRING2, filter(SUBSTRING1, allTests)).
+
+```shell
+% ./runtests --exclude negative --filter numbers
+
+OK Adds two numbers
+	left:  4
+	right: 4
+
+ALL TESTS PASSED: 1/1
+```
+
 
 ___________________________________________________
 
@@ -178,25 +429,48 @@ val it = ("FAILED \n\treals not equal <> ~explicit fail~\n", false):
 ```
 
 ### (left : ''a) == (right : ''a)
+### eq (''a -> string) -> (left : ''a * right : ''a) -> raisesTestExn
 
 Fails the test case if `left` and `right` are not equal. The first element of
-the testresult will contain string representations of the data (courtesy of
-`PolyML.makestring`).
+the testresult will contain string representations of the data. The default
+representation is `"?"`, but this can be overriden by locally redefining `==`
+via partial application of `eq`.
 
-```
+
+```sml
 > val t4 = T (fn () => {a="record"} == {a="cd"});
 val t4 = TC ("", fn): tcase
 > runTest t4;
-val it = ("FAILED \n\t{a = \"record\"} <> {a = \"cd\"}\n", false): testresult
+val it = ("FAILED \n\tleft:  ?\n\tright: ?\n", false): testresult
 > print (#1 it);
 FAILED
-	{a = "record"} <> {a = "cd"}
+	left:  ?
+	right: ?
 val it = (): unit
 ```
+
+Now, using `eq`:
+
+```sml
+> let val op == = Assert.eq PolyML.makestring;
+# in runTest (T (fn () => {a = "record"} == {a="cd"}))
+# end;
+val it =
+   ("FAILED \n\tleft:  {a = \"record\"}\n\tright: {a = \"cd\"}\n", false):
+   testresult
+> print (#1 it);
+FAILED
+	left:  {a = "record"}
+	right: {a = "cd"}
+val it = (): unit
+```
+
 
 ### (left : ''a) =/= (right : ''a)
 
 The inverse of `==`. Will fail the test case if `left` and `right` _are_ equal.
+Similarly as with `==`, apply a stringifying function to `Assert.neq` to obtain
+a nicer, pretty-printing version.
 
 
 ### (expected : exn) != (f : (unit -> 'z))
@@ -261,5 +535,3 @@ side non-specific, like so:
 The above will fail the test if `someOp` does not return ALLGOOD. If it does,
 it'll bind `ag` to `ALLGOOD` and proceed to evaluate subsequent expressions as
 normal.
-
-  

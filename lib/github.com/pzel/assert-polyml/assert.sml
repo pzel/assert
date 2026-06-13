@@ -21,6 +21,7 @@ signature ASSERT = sig
 
   val runTest : tcase -> testresult;
   val runTests : tcase list -> unit;
+  val runTestsWith : tcase list -> string list -> unit;
 end
 
 
@@ -83,7 +84,6 @@ fun (left : ''a) =?= (right : ''a) : ''a =
     then left
     else raise (TestErr ("Assertion failed:", "~values not equal~"))
 
-
 fun runTest ((TC (desc,f)) : tcase) : testresult =
     let fun fmt (result, data) =
             String.concat([result, " ", desc, "\n\t", data, "\n"]);
@@ -95,10 +95,49 @@ fun runTest ((TC (desc,f)) : tcase) : testresult =
       handle TestOK(a,b) =>  (fmt ("OK",  "left:  "^a^"\n\tright: "^b), true)
            | TestErr(a,b) => (fmt ("FAILED", "left:  "^a^"\n\tright: "^b), false)
            | exn =>          (fmt ("ERROR", ppExn exn), false)
+    end;
+
+type opts = {
+  verbose : bool,
+  filter: string list,
+  exclude: string list
+}
+
+fun findTail pred [] = []
+  | findTail pred (a::b::c) = if (pred a) then b::c else findTail pred (b::c)
+  | findTail pred (a::[]) = if (pred a) then raise Fail "Missing argument value" else []
+
+fun parseArgs (cmdLineArgs : string list) : opts =
+    let fun eql (s: ''a) = fn (t) => s = t ;
+        val filterStrings = (case findTail (eql "--filter") cmdLineArgs
+                              of (s::_) => [s]
+                              |  _ => []);
+        val excludeStrings = (case findTail (eql "--exclude") cmdLineArgs
+                               of (s::_) => [s]
+                               |  _ => []);
+        val verbose = List.exists (eql "--verbose") cmdLineArgs
+                      orelse (not (null filterStrings));
+    in {verbose=verbose,
+        filter=filterStrings,
+        exclude=excludeStrings}
     end
 
-fun runTests (tests : tcase list) =
+fun runTestsWith (allTests: tcase list) (cmdLineOptions: string list) : unit =
     let
+      val opts as {verbose,filter,exclude} = parseArgs cmdLineOptions;
+      fun reject f l = List.filter (not o f) l
+      val filteredTests =
+          if (null filter)
+          then allTests
+          else List.filter (fn (TC (name,_)) =>
+                               List.exists (fn f => String.isSubstring f name) filter)
+                           allTests
+      val tests =
+          if (null exclude)
+          then filteredTests
+          else reject (fn (TC (name,_)) =>
+                          List.exists (fn f => String.isSubstring f name) exclude)
+                      filteredTests;
       val results = map runTest tests;
       val errors = List.filter (fn (_, n) => not n) results;
       val successes = List.filter (fn (_, n) => n) results;
@@ -110,12 +149,17 @@ fun runTests (tests : tcase list) =
       val success_ratio = concat [i test_count, "/", i test_count]
     in
       if error_count = 0
-      then p ("ALL TESTS PASSED: " ^ success_ratio)
+      then (p "";
+            if verbose then app (p o #1) successes else ();
+            p ("ALL TESTS PASSED: " ^ success_ratio))
       else (p "";
-            (* app (p o #1) successes; *) (* TODO: make this optional *)
+            if verbose then app (p o #1) successes else ();
             app (p o #1) errors;
             p ("\nTESTS FAILED: " ^ error_ratio ^ "\n");
             OS.Process.exit(OS.Process.failure))
     end
+
+fun runTests tests = runTestsWith tests [];
+
 
 end : ASSERT
