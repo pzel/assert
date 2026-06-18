@@ -1,39 +1,39 @@
 signature ASSERT = sig
-  type testresult = (string * bool);
-  type tcase;
-  type assertion;
+  type testresult = (string * bool)
+  type tcase
+  type assertion
 
-  val It : string -> (unit -> assertion) -> tcase;
-  val T : (unit -> assertion) -> tcase;
-  val Pending : string -> (unit -> assertion) -> tcase;
-  val succeed : string -> assertion;
-  val fail : string -> assertion;
+  val It : string -> (unit -> assertion) -> tcase
+  val T : (unit -> assertion) -> tcase
+  val Pending : string -> (unit -> assertion) -> tcase
+  val succeed : string -> assertion
+  val fail : string -> assertion
 
-  val == :                    (''a * ''a) -> assertion;
-  val eq : (''a -> string) -> (''a * ''a) -> assertion;
+  val == :                    (''a * ''a) -> assertion
+  val eq : (''a -> string) -> (''a * ''a) -> assertion
 
-  val =/= :                    (''a * ''a) -> assertion;
-  val neq : (''a -> string) -> (''a * ''a) -> assertion;
+  val =/= :                    (''a * ''a) -> assertion
+  val neq : (''a -> string) -> (''a * ''a) -> assertion
 
-  val != : (exn * (unit -> 'z)) -> assertion;
-  val =?= : (''a * ''a) -> ''a;
+  val != : (exn * (unit -> 'z)) -> assertion
+  val =?= : (''a * ''a) -> ''a
 
-  val runTest : tcase -> testresult;
-  val runTests : tcase list -> unit;
-  val runTestsWith : tcase list -> string list -> unit;
+  val runTest : tcase -> testresult
+  val runTests : tcase list -> unit
+  val runTestsWith : tcase list -> string list -> unit
 end
 
 
 structure Assert = struct
 
-exception TestOK of string * string;
-exception TestErr of string * string;
-datatype assertion = RAISES of unit;
-infixr 2 == != =/= =?=;
+exception TestOK of string * string
+exception TestErr of string * string
+datatype assertion = RAISES of unit
+infixr 2 == != =/= =?=
 
-fun return (a: 'a) : assertion = RAISES (ignore a);
+fun return (a: 'a) : assertion = RAISES (ignore a)
 
-type testresult = (string * bool);
+type testresult = (string * bool)
 datatype tcase = TC of (string * (unit -> assertion))
 
 fun succeed (msg : string) : assertion =
@@ -58,7 +58,7 @@ fun neq show (left : ''a, right: ''a) : assertion =
            else raise TestOK (show left, show right))
 
 fun showQuestionMark (_ : 'a) : string =
-    "?";
+    "?"
 
 fun (left : ''a) == (right : ''a) : assertion =
     eq showQuestionMark (left, right)
@@ -87,13 +87,20 @@ fun runTest ((TC (desc,f)) : tcase) : testresult =
     let fun fmt (result, data) =
             String.concat([result, " ", desc, "\n\t", data, "\n"]);
         fun ppExn (e : exn) : string = "exception " ^ exnMessage e;
-    in
-                       (* this outcome is likely uncompileable now
-                          that assertion is opaque *)
-      ( f ();             (fmt ("ERROR", "~no assertion in test body~"), false))
-      handle TestOK(a,b) =>  (fmt ("OK",  "left:  "^a^"\n\tright: "^b), true)
-           | TestErr(a,b) => (fmt ("FAILED", "left:  "^a^"\n\tright: "^b), false)
-           | exn =>          (fmt ("ERROR", ppExn exn), false)
+        val sentinel : testresult =
+            (* If this value is ever seen, it means the testcase `f` was
+               constructed in a way that defeats the type system. (i.e. the
+               test was somehow not wrapped in RAISES f.)
+
+               We can't remove it outright from the code, as the in-clause
+               needs to be nominally typed `testresult`, while `f` is typed
+               `assertion`.
+             *)
+            (fmt ("ERROR", "~BUG: testcase ran with no assertion~"), false)
+    in (f (); sentinel)
+       handle TestOK(a,b) =>  (fmt ("OK",  "left:  "^a^"\n\tright: "^b), true)
+            | TestErr(a,b) => (fmt ("FAILED", "left:  "^a^"\n\tright: "^b), false)
+            | exn =>          (fmt ("ERROR", ppExn exn), false)
     end;
 
 type opts = {
@@ -107,15 +114,15 @@ fun findTail pred [] = []
   | findTail pred (a::[]) = if (pred a) then raise Fail "Missing argument value" else []
 
 fun parseArgs (cmdLineArgs : string list) : opts =
-    let fun eql (s: ''a) = fn (t) => s = t ;
+    let fun eql (s: ''a) = fn (t) => s = t
         val filterStrings = (case findTail (eql "--filter") cmdLineArgs
                               of (s::_) => [s]
-                              |  _ => []);
+                              |  _ => [])
         val excludeStrings = (case findTail (eql "--exclude") cmdLineArgs
                                of (s::_) => [s]
-                               |  _ => []);
+                               |  _ => [])
         val verbose = List.exists (eql "--verbose") cmdLineArgs
-                      orelse (not (null filterStrings));
+                      orelse (not (null filterStrings))
     in {verbose=verbose,
         filter=filterStrings,
         exclude=excludeStrings}
@@ -123,7 +130,7 @@ fun parseArgs (cmdLineArgs : string list) : opts =
 
 fun runTestsWith (allTests: tcase list) (cmdLineOptions: string list) : unit =
     let
-      val opts as {verbose,filter,exclude} = parseArgs cmdLineOptions;
+      val opts as {verbose,filter,exclude} = parseArgs cmdLineOptions
       fun reject f l = List.filter (not o f) l
       val filteredTests =
           if (null filter)
@@ -136,15 +143,15 @@ fun runTestsWith (allTests: tcase list) (cmdLineOptions: string list) : unit =
           then filteredTests
           else reject (fn (TC (name,_)) =>
                           List.exists (fn f => String.isSubstring f name) exclude)
-                      filteredTests;
-      val results = map runTest tests;
-      val errors = List.filter (fn (_, n) => not n) results;
-      val successes = List.filter (fn (_, n) => n) results;
-      val error_count = length errors;
-      val test_count = length results;
-      val p = fn s => ignore(print (s ^"\n"));
-      val i = Int.toString;
-      val error_ratio = concat [i error_count, "/", i test_count];
+                      filteredTests
+      val results = map runTest tests
+      val errors = List.filter (fn (_, n) => not n) results
+      val successes = List.filter (fn (_, n) => n) results
+      val error_count = length errors
+      val test_count = length results
+      val p = fn s => ignore(print (s ^"\n"))
+      val i = Int.toString
+      val error_ratio = concat [i error_count, "/", i test_count]
       val success_ratio = concat [i test_count, "/", i test_count]
     in
       if error_count = 0
@@ -158,7 +165,7 @@ fun runTestsWith (allTests: tcase list) (cmdLineOptions: string list) : unit =
             OS.Process.exit(OS.Process.failure))
     end
 
-fun runTests tests = runTestsWith tests [];
+fun runTests tests = runTestsWith tests []
 
 
 end : ASSERT
