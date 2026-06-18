@@ -5,19 +5,21 @@ Assert: An ergonomic testing library for Standard ML
 signature ASSERT = sig
   type testresult = (string * bool);
   type tcase;
-  type raisesTestExn;
-  val It : string -> (unit -> raisesTestExn) -> tcase;
-  val T : (unit -> raisesTestExn) -> tcase;
-  val Pending : string -> (unit -> raisesTestExn) -> tcase;
-  val succeed : string -> raisesTestExn;
-  val fail : string -> raisesTestExn;
-  val == : (''a * ''a) -> raisesTestExn;
-  val eq : (''a -> string) -> (''a * ''a) -> raisesTestExn;
+  type assertion;
 
-  val =/= : (''a * ''a) -> raisesTestExn;
-  val neq : (''a -> string) -> (''a * ''a) -> raisesTestExn;
+  val It : string -> (unit -> assertion) -> tcase;
+  val T : (unit -> assertion) -> tcase;
+  val Pending : string -> (unit -> assertion) -> tcase;
+  val succeed : string -> assertion;
+  val fail : string -> assertion;
 
-  val != : (exn * (unit -> 'z)) -> raisesTestExn;
+  val == :                    (''a * ''a) -> assertion;
+  val eq : (''a -> string) -> (''a * ''a) -> assertion;
+
+  val =/= :                    (''a * ''a) -> assertion;
+  val neq : (''a -> string) -> (''a * ''a) -> assertion;
+
+  val != : (exn * (unit -> 'z)) -> assertion;
   val =?= : (''a * ''a) -> ''a;
 
   val runTest : tcase -> testresult;
@@ -390,11 +392,11 @@ Let's take a look at the type of the `It` function above:
 
 ```
 > Assert.It;
-val it = fn: string -> (unit -> Assert.raisesTestExn) -> Assert.tcase
+val it = fn: string -> (unit -> Assert.assertion) -> Assert.tcase
 ```
 
 It takes a string that describes the test case, and then a function typed
-`(unit -> Assert.raisesTestExn)`. How do we obtain such a function? By
+`(unit -> Assert.assertion)`. How do we obtain such a function? By
 embedding within its body one of the assertions offered by the module. They are
 listed below.
 
@@ -429,7 +431,7 @@ val it = ("FAILED \n\treals not equal <> ~explicit fail~\n", false):
 ```
 
 ### (left : ''a) == (right : ''a)
-### eq (''a -> string) -> (left : ''a * right : ''a) -> raisesTestExn
+### eq (''a -> string) -> (left : ''a * right : ''a) -> assertion
 
 Fails the test case if `left` and `right` are not equal. The first element of
 the testresult will contain string representations of the data. The default

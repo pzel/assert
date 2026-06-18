@@ -1,23 +1,22 @@
 signature ASSERT = sig
   type testresult = (string * bool);
   type tcase;
-  type raisesTestExn;
-  val It : string -> (unit -> raisesTestExn) -> tcase;
-  val T : (unit -> raisesTestExn) -> tcase;
-  val Pending : string -> (unit -> raisesTestExn) -> tcase;
-  val succeed : string -> raisesTestExn;
-  val fail : string -> raisesTestExn;
-  val == : (''a * ''a) -> raisesTestExn;
-  val =/= : (''a * ''a) -> raisesTestExn;
-  val != : (exn * (unit -> 'z)) -> raisesTestExn;
-  val =?= : (''a * ''a) -> ''a;
+  type assertion;
 
-  (* V0.5+ API: Poly no longer carries type info at runtime, so
-     PolyML.makestring will always spit out '?'
-     unless the type is  known at compile-time
-   *)
-  val eq : (''a -> string) -> (''a * ''a) -> raisesTestExn;
-  val neq : (''a -> string) -> (''a * ''a) -> raisesTestExn;
+  val It : string -> (unit -> assertion) -> tcase;
+  val T : (unit -> assertion) -> tcase;
+  val Pending : string -> (unit -> assertion) -> tcase;
+  val succeed : string -> assertion;
+  val fail : string -> assertion;
+
+  val == :                    (''a * ''a) -> assertion;
+  val eq : (''a -> string) -> (''a * ''a) -> assertion;
+
+  val =/= :                    (''a * ''a) -> assertion;
+  val neq : (''a -> string) -> (''a * ''a) -> assertion;
+
+  val != : (exn * (unit -> 'z)) -> assertion;
+  val =?= : (''a * ''a) -> ''a;
 
   val runTest : tcase -> testresult;
   val runTests : tcase list -> unit;
@@ -29,18 +28,18 @@ structure Assert = struct
 
 exception TestOK of string * string;
 exception TestErr of string * string;
-datatype raisesTestExn = RAISES of unit;
+datatype assertion = RAISES of unit;
 infixr 2 == != =/= =?=;
 
-fun return (a: 'a) : raisesTestExn = RAISES (ignore a);
+fun return (a: 'a) : assertion = RAISES (ignore a);
 
 type testresult = (string * bool);
-datatype tcase = TC of (string * (unit -> raisesTestExn))
+datatype tcase = TC of (string * (unit -> assertion))
 
-fun succeed (msg : string) : raisesTestExn =
+fun succeed (msg : string) : assertion =
     return (raise TestOK (msg, msg))
 
-fun fail (msg : string) : raisesTestExn =
+fun fail (msg : string) : assertion =
     return (raise TestErr (msg, "~explicit fail~"))
 
 fun It desc t = TC(desc, t)
@@ -48,12 +47,12 @@ fun T t = TC("", t)
 fun Pending desc _ = TC(desc, fn () => succeed "~PENDING~")
 
 
-fun eq show (left : ''a, right: ''a) : raisesTestExn =
+fun eq show (left : ''a, right: ''a) : assertion =
     return (if left <> right
            then raise TestErr (show left, show right)
            else raise TestOK (show left, show right))
 
-fun neq show (left : ''a, right: ''a) : raisesTestExn =
+fun neq show (left : ''a, right: ''a) : assertion =
     return (if left = right
            then raise TestErr (show left, show right)
            else raise TestOK (show left, show right))
@@ -61,13 +60,13 @@ fun neq show (left : ''a, right: ''a) : raisesTestExn =
 fun showQuestionMark (_ : 'a) : string =
     "?";
 
-fun (left : ''a) == (right : ''a) : raisesTestExn =
+fun (left : ''a) == (right : ''a) : assertion =
     eq showQuestionMark (left, right)
 
-fun (left : ''a) =/= (right : ''a) : raisesTestExn =
+fun (left : ''a) =/= (right : ''a) : assertion =
     neq showQuestionMark (left, right)
 
-fun (expected : exn) != (f : (unit -> 'z)) : raisesTestExn =
+fun (expected : exn) != (f : (unit -> 'z)) : assertion =
     (return (ignore(f())
              handle e => let val (exp, got) = (exnMessage expected, exnMessage e);
                             fun fmt e = "exception "^ e;
@@ -90,7 +89,7 @@ fun runTest ((TC (desc,f)) : tcase) : testresult =
         fun ppExn (e : exn) : string = "exception " ^ exnMessage e;
     in
                        (* this outcome is likely uncompileable now
-                          that raisesTestExn is opaque *)
+                          that assertion is opaque *)
       ( f ();             (fmt ("ERROR", "~no assertion in test body~"), false))
       handle TestOK(a,b) =>  (fmt ("OK",  "left:  "^a^"\n\tright: "^b), true)
            | TestErr(a,b) => (fmt ("FAILED", "left:  "^a^"\n\tright: "^b), false)
