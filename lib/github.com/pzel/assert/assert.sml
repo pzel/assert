@@ -8,6 +8,7 @@ signature ASSERT = sig
   val Pending : string -> (unit -> assertion) -> tcase
   val succeed : string -> assertion
   val fail : string -> assertion
+  val fail' : string -> string -> assertion
 
   val == :                    (''a * ''a) -> assertion
   val eq : (''a -> string) -> (''a * ''a) -> assertion
@@ -41,6 +42,9 @@ fun succeed (msg : string) : assertion =
 
 fun fail (msg : string) : assertion =
     return (raise TestErr (msg, "~explicit fail~"))
+
+fun fail' (left : string) (right: string) : assertion =
+    return (raise TestErr (left, right))
 
 fun It desc t = TC(desc, t)
 fun T t = TC("", t)
