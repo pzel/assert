@@ -107,6 +107,10 @@ fun runTest ((TC (desc,f)) : tcase) : testresult =
             | exn =>          (fmt ("ERROR", ppExn exn), false)
     end;
 
+
+fun runTestVerbose (t as (TC (desc,_)) : tcase) : testresult =
+    (print ("Testing: '"^desc^"'\n"); runTest t)
+
 type opts = {
   verbose : bool,
   filter: string list,
@@ -148,7 +152,7 @@ fun runTestsWith (allTests: tcase list) (cmdLineOptions: string list) : unit =
           else reject (fn (TC (name,_)) =>
                           List.exists (fn f => String.isSubstring f name) exclude)
                       filteredTests
-      val results = map runTest tests
+      val results = map (if verbose then runTestVerbose else runTest) tests
       val errors = List.filter (fn (_, n) => not n) results
       val successes = List.filter (fn (_, n) => n) results
       val error_count = length errors

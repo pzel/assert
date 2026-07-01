@@ -17,12 +17,12 @@ assert () {
 
 
 verbose_run=$(./bin/exampleTestSuite --verbose | awk '/OK/ {print} ; END { print NR }')
-assert "$verbose_run" "OK asserts on int equality OK asserts on int inequality OK asserts on record equality OK should never run 36"
+assert "$verbose_run" "OK asserts on int equality OK asserts on int inequality OK asserts on record equality OK should never run 44"
 
 
 # filtering automatically sets verbose flag too
 filter_run=$(./bin/exampleTestSuite --filter 'record equality' | awk '/OK|FAILED/ {print} ; END { print NR }')
-assert "$filter_run" "OK asserts on record equality FAILED fails record equality when values differ TESTS FAILED: 1/2 12"
+assert "$filter_run" "OK asserts on record equality FAILED fails record equality when values differ TESTS FAILED: 1/2 14"
 
 
 # exclusion removes tests from run but DOESNT set verbose flag
@@ -33,7 +33,7 @@ assert "$excluded_run" "ALL TESTS PASSED: 4/4 2"
 
 # exclusion is applied after filtering
 exclude_filtered_run=$(./bin/exampleTestSuite --filter 'record equality' --exclude 'differ' | awk '/PASSED/ {print} ; END { print NR }')
-assert "$exclude_filtered_run" "ALL TESTS PASSED: 1/1 6"
+assert "$exclude_filtered_run" "ALL TESTS PASSED: 1/1 7"
 
 
 default_run=$(./bin/exampleTestSuite | awk '/TESTS FAILED/ {print} ; END { print NR }')
