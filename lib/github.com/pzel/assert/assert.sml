@@ -173,7 +173,7 @@ fun runTestsWith (allTests: tcase list) (cmdLineOptions: string list) : unit =
             OS.Process.exit(OS.Process.failure))
     end
 
-fun runTests tests = runTestsWith tests []
+fun runTests tests = runTestsWith tests (CommandLine.arguments())
 
 
 end : ASSERT
