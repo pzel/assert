@@ -38,8 +38,6 @@ TLDR: How to use this library (via smlpkg + MLB)
 ```sml
 (* file: mysystem.sml *)
 fun adder (x: int, y: int) : int = x + y;
-fun welcomer (name: string) : string = "hello, " ^ name;
-fun iffy (l: int list) : int = hd(tl(l));
 
 ```
 
