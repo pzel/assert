@@ -40,6 +40,11 @@ default_run=$(./bin/exampleTestSuite | awk '/TESTS FAILED/ {print} ; END { print
 assert "$default_run" "TESTS FAILED: 4/8 20"
 
 
+
+stateful_run=$(./bin/exampleStatefulSuite | awk '/TESTS FAILED/ {print} ; END { print NR }')
+assert "$stateful_run" "TESTS FAILED: 1/3 8"
+
+
 printf "\n\nCOMMAND LINE TESTS PASSED SUCCESSFULLY\n\n"
 exit 0
 

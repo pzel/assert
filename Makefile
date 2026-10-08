@@ -16,3 +16,6 @@ test-cmdline-interface: bin/exampleTestSuite
 
 bin/exampleTestSuite: $(shell find  $(LIBDIR) | grep sml$$)
 	mlton -output $@ $(LIBDIR)/test/exampleTestSuite.mlb
+
+bin/exampleStatefulSuite: $(shell find  $(LIBDIR) | grep sml$$)
+	mlton -output $@ $(LIBDIR)/test/exampleStatefulSuite.mlb

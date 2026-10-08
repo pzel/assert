@@ -21,7 +21,12 @@ signature ASSERT = sig
 
   val runTest : tcase -> testresult
   val runTests : tcase list -> unit
-  val runTestsWith : tcase list -> string list -> unit
+  val runTestsWith : tcase list -> string list -> unit;
+
+  (* stateful, io-full interface *)
+  val addTests : string -> tcase list -> unit
+  val runKnownTests : unit -> unit;
+
 end
 
 
@@ -175,5 +180,17 @@ fun runTestsWith (allTests: tcase list) (cmdLineOptions: string list) : unit =
 
 fun runTests tests = runTestsWith tests (CommandLine.arguments())
 
+
+local
+  val testDB : tcase list ref = ref []
+in
+
+fun addTests ctx ts =
+  testDB := (!testDB) @ (map (fn (TC(desc, f)) => TC(ctx ^ ": " ^ desc, f)) ts)
+
+fun runKnownTests () =
+  runTestsWith (!testDB) (CommandLine.arguments());
+
+end (* local *)
 
 end : ASSERT
