@@ -116,8 +116,12 @@ fun runTest ((TC (desc,f)) : tcase) : testresult =
 fun runTestVerbose (t as (TC (desc,_)) : tcase) : testresult =
     (print ("Testing: '"^desc^"'\n"); runTest t)
 
+fun runTestProgress (t : tcase) : testresult =
+    (runTest t before print ".")
+
 type opts = {
   verbose : bool,
+  progress: bool,
   filter: string list,
   exclude: string list
 }
@@ -126,24 +130,28 @@ fun findTail pred [] = []
   | findTail pred (a::b::c) = if (pred a) then b::c else findTail pred (b::c)
   | findTail pred (a::[]) = if (pred a) then raise Fail "Missing argument value" else []
 
-fun parseArgs (cmdLineArgs : string list) : opts =
+fun parseArgs (args : string list) : opts =
     let fun eql (s: ''a) = fn (t) => s = t
-        val filterStrings = (case findTail (eql "--filter") cmdLineArgs
+        val filterStrings = (case findTail (eql "--filter") args
                               of (s::_) => [s]
                               |  _ => [])
-        val excludeStrings = (case findTail (eql "--exclude") cmdLineArgs
+        val excludeStrings = (case findTail (eql "--exclude") args
                                of (s::_) => [s]
                                |  _ => [])
-        val verbose = List.exists (eql "--verbose") cmdLineArgs
+        val verbose = List.exists (eql "--verbose") args
                       orelse (not (null filterStrings))
+        val progress = List.exists (eql "--progress") args
+                       andalso (not verbose)
     in {verbose=verbose,
+        progress=progress,
         filter=filterStrings,
         exclude=excludeStrings}
     end
 
 fun runTestsWith (allTests: tcase list) (cmdLineOptions: string list) : unit =
     let
-      val opts as {verbose,filter,exclude} = parseArgs cmdLineOptions
+      val opts as {verbose,filter,exclude,progress}
+        = parseArgs cmdLineOptions
       fun reject f l = List.filter (not o f) l
       val filteredTests =
           if (null filter)
@@ -157,7 +165,11 @@ fun runTestsWith (allTests: tcase list) (cmdLineOptions: string list) : unit =
           else reject (fn (TC (name,_)) =>
                           List.exists (fn f => String.isSubstring f name) exclude)
                       filteredTests
-      val results = map (if verbose then runTestVerbose else runTest) tests
+      val results = map (if verbose
+                         then runTestVerbose
+                         else if progress
+                         then runTestProgress
+                         else runTest) tests
       val errors = List.filter (fn (_, n) => not n) results
       val successes = List.filter (fn (_, n) => n) results
       val error_count = length errors
