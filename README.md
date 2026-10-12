@@ -3,28 +3,38 @@ Assert: An ergonomic testing library for Standard ML
 
 ```
 signature ASSERT = sig
-  type testresult = (string * bool);
-  type tcase;
-  type assertion;
+  type testresult = (string * bool)
+  type tcase
+  type assertion
+  type 'a show
 
-  val It : string -> (unit -> assertion) -> tcase;
-  val T : (unit -> assertion) -> tcase;
-  val Pending : string -> (unit -> assertion) -> tcase;
-  val succeed : string -> assertion;
-  val fail : string -> assertion;
+  val It : string -> (unit -> assertion) -> tcase
+  val T : (unit -> assertion) -> tcase
+  val Pending : string -> (unit -> assertion) -> tcase
+  val succeed : string -> assertion
+  val fail : string -> assertion
+  val fail' : string -> string -> assertion
 
-  val == :                    (''a * ''a) -> assertion;
-  val eq : (''a -> string) -> (''a * ''a) -> assertion;
+  val ==  : (''a * ''a)             -> assertion
+  val === : (''a * ''a) -> ''a show -> assertion
+  val eq  : ''a show -> (''a * ''a) -> assertion
 
-  val =/= :                    (''a * ''a) -> assertion;
-  val neq : (''a -> string) -> (''a * ''a) -> assertion;
+  val =/=  : (''a * ''a)             -> assertion
+  val =//= : (''a * ''a) -> ''a show -> assertion
+  val neq  : ''a show -> (''a * ''a) -> assertion
 
-  val != : (exn * (unit -> 'z)) -> assertion;
-  val =?= : (''a * ''a) -> ''a;
+  val != : (exn * (unit -> 'z))      -> assertion
 
-  val runTest : tcase -> testresult;
-  val runTests : tcase list -> unit;
+  val =?= : (''a * ''a) -> ''a
+  val =??= : (''a * ''a) -> string -> ''a
+
+  val runTest : tcase -> testresult
+  val runTests : tcase list -> unit
   val runTestsWith : tcase list -> string list -> unit;
+
+  (* stateful, io-full interface *)
+  val addTests : string -> tcase list -> unit
+  val runKnownTests : unit -> unit;
 end
 ```
 

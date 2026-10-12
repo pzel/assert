@@ -2,6 +2,7 @@ signature ASSERT = sig
   type testresult = (string * bool)
   type tcase
   type assertion
+  type 'a show
 
   val It : string -> (unit -> assertion) -> tcase
   val T : (unit -> assertion) -> tcase
@@ -10,14 +11,18 @@ signature ASSERT = sig
   val fail : string -> assertion
   val fail' : string -> string -> assertion
 
-  val == :                    (''a * ''a) -> assertion
-  val eq : (''a -> string) -> (''a * ''a) -> assertion
+  val ==  : (''a * ''a)             -> assertion
+  val === : (''a * ''a) -> ''a show -> assertion
+  val eq  : ''a show -> (''a * ''a) -> assertion
 
-  val =/= :                    (''a * ''a) -> assertion
-  val neq : (''a -> string) -> (''a * ''a) -> assertion
+  val =/=  : (''a * ''a)             -> assertion
+  val =//= : (''a * ''a) -> ''a show -> assertion
+  val neq  : ''a show -> (''a * ''a) -> assertion
 
-  val != : (exn * (unit -> 'z)) -> assertion
+  val != : (exn * (unit -> 'z))      -> assertion
+
   val =?= : (''a * ''a) -> ''a
+  val =??= : (''a * ''a) -> string -> ''a
 
   val runTest : tcase -> testresult
   val runTests : tcase list -> unit
@@ -26,7 +31,6 @@ signature ASSERT = sig
   (* stateful, io-full interface *)
   val addTests : string -> tcase list -> unit
   val runKnownTests : unit -> unit;
-
 end
 
 
@@ -35,89 +39,104 @@ structure Assert = struct
 exception TestOK of string * string
 exception TestErr of string * string
 datatype assertion = RAISES of unit
-infixr 2 == != =/= =?=
+infixr 2 == ===
+infixr 2 =/= =//=
+infixr 2 =?= =??=
+infixr 2 !=
+
 
 fun return (a: 'a) : assertion = RAISES (ignore a)
 
 type testresult = (string * bool)
+type 'a show = ('a -> string)
 datatype tcase = TC of (string * (unit -> assertion))
 
 fun succeed (msg : string) : assertion =
-    return (raise TestOK (msg, msg))
+  return (raise TestOK (msg, msg))
 
 fun fail (msg : string) : assertion =
-    return (raise TestErr (msg, "~explicit fail~"))
+  return (raise TestErr (msg, "~explicit fail~"))
 
 fun fail' (left : string) (right: string) : assertion =
-    return (raise TestErr (left, right))
+  return (raise TestErr (left, right))
 
 fun It desc t = TC(desc, t)
 fun T t = TC("", t)
 fun Pending desc _ = TC(desc, fn () => succeed "~PENDING~")
 
-
 fun eq show (left : ''a, right: ''a) : assertion =
-    return (if left <> right
-           then raise TestErr (show left, show right)
-           else raise TestOK (show left, show right))
+  return (if left <> right
+          then raise TestErr (show left, show right)
+          else raise TestOK (show left, show right))
 
 fun neq show (left : ''a, right: ''a) : assertion =
-    return (if left = right
-           then raise TestErr (show left, show right)
-           else raise TestOK (show left, show right))
+  return (if left = right
+          then raise TestErr (show left, show right)
+          else raise TestOK (show left, show right))
 
 fun showQuestionMark (_ : 'a) : string =
-    "?"
+  "?"
 
 fun (left : ''a) == (right : ''a) : assertion =
-    eq showQuestionMark (left, right)
+  eq showQuestionMark (left, right)
+
+fun (left : ''a) === (right : ''a) : (''a show -> assertion) =
+  fn show => eq show (left, right)
 
 fun (left : ''a) =/= (right : ''a) : assertion =
-    neq showQuestionMark (left, right)
+  neq showQuestionMark (left, right)
+
+fun (left : ''a) =//= (right : ''a) : (''a show -> assertion) =
+  fn show => neq show (left, right)
 
 fun (expected : exn) != (f : (unit -> 'z)) : assertion =
-    (return (ignore(f())
-             handle e => let val (exp, got) = (exnMessage expected, exnMessage e);
-                            fun fmt e = "exception "^ e;
-                        in if exp = got
-                           then raise TestOK (fmt exp, fmt got)
-                           else raise TestErr (fmt exp, fmt got)
-                        end);
-     (* We ran left() without any errors, even though we expected them.
+  (return (ignore(f())
+           handle e => let val (exp, got) = (exnMessage expected, exnMessage e);
+                           fun fmt e = "exception "^ e;
+                       in if exp = got
+                          then raise TestOK (fmt exp, fmt got)
+                          else raise TestErr (fmt exp, fmt got)
+                       end);
+   (* We ran left() without any errors, even though we expected them.
         This makes the current test case a failure. *)
-     raise TestErr (exnMessage expected, "~did not raise~"))
+   raise TestErr (exnMessage expected, "~did not raise~"))
+
+
+fun (left : ''a) =??= (right: ''a) =
+  fn msg =>
+     if left = right
+     then left
+     else raise (TestErr ("Assertion failed:", msg))
 
 fun (left : ''a) =?= (right : ''a) : ''a =
-    if left = right
-    then left
-    else raise (TestErr ("Assertion failed:", "~values not equal~"))
+  ((left =??= right) "~values not equal~")
 
 fun runTest ((TC (desc,f)) : tcase) : testresult =
-    let fun fmt (result, data) =
-            String.concat([result, " ", desc, "\n\t", data, "\n"]);
-        fun ppExn (e : exn) : string = "exception " ^ exnMessage e;
-        val sentinel : testresult =
-            (* If this value is ever seen, it means the testcase `f` was
+  let fun fmt (result, data) =
+        String.concat([result, " ", desc, "\n\t", data, "\n"]);
+      fun ppExn (e : exn) : string = "exception " ^ exnMessage e;
+      val sentinel : testresult =
+        (* If this value is ever seen, it means the testcase `f` was
                constructed in a way that defeats the type system. (i.e. the
                test was somehow not wrapped in RAISES f.)
 
                We can't remove it outright from the code, as the in-clause
                needs to be nominally typed `testresult`, while `f` is typed
                `assertion`.
-             *)
-            (fmt ("ERROR", "~BUG: testcase ran with no assertion~"), false)
-    in (f (); sentinel)
-       handle TestOK(a,b) =>  (fmt ("OK",  "left:  "^a^"\n\tright: "^b), true)
-            | TestErr(a,b) => (fmt ("FAILED", "left:  "^a^"\n\tright: "^b), false)
-            | exn =>          (fmt ("ERROR", ppExn exn), false)
-    end;
+         *)
+        (fmt ("ERROR", "~BUG: testcase ran with no assertion~"), false)
+  in (f (); sentinel)
+     handle TestOK(a,b) =>  (fmt ("OK",  "left:  "^a^"\n\tright: "^b), true)
+          | TestErr(a,b) => (fmt ("FAILED", "left:  "^a^"\n\tright: "^b), false)
+          | exn =>          (fmt ("ERROR", ppExn exn), false)
+  end;
 
 
 fun runTestVerbose (t as (TC (desc,_)) : tcase) : testresult =
-    (print ("Testing: '"^desc^"'\n"); runTest t)
+  (print ("Testing: '"^desc^"'\n"); runTest t)
 
 fun runTestProgress (t : tcase) : testresult =
-    (runTest t before print ".")
+  (runTest t before print ".")
 
 type opts = {
   verbose : bool,
@@ -131,64 +150,64 @@ fun findTail pred [] = []
   | findTail pred (a::[]) = if (pred a) then raise Fail "Missing argument value" else []
 
 fun parseArgs (args : string list) : opts =
-    let fun eql (s: ''a) = fn (t) => s = t
-        val filterStrings = (case findTail (eql "--filter") args
-                              of (s::_) => [s]
-                              |  _ => [])
-        val excludeStrings = (case findTail (eql "--exclude") args
-                               of (s::_) => [s]
-                               |  _ => [])
-        val verbose = List.exists (eql "--verbose") args
-                      orelse (not (null filterStrings))
-        val progress = List.exists (eql "--progress") args
-                       andalso (not verbose)
-    in {verbose=verbose,
-        progress=progress,
-        filter=filterStrings,
-        exclude=excludeStrings}
-    end
+  let fun eql (s: ''a) = fn (t) => s = t
+      val filterStrings = (case findTail (eql "--filter") args
+                            of (s::_) => [s]
+                            |  _ => [])
+      val excludeStrings = (case findTail (eql "--exclude") args
+                             of (s::_) => [s]
+                             |  _ => [])
+      val verbose = List.exists (eql "--verbose") args
+                    orelse (not (null filterStrings))
+      val progress = List.exists (eql "--progress") args
+                     andalso (not verbose)
+  in {verbose=verbose,
+      progress=progress,
+      filter=filterStrings,
+      exclude=excludeStrings}
+  end
 
 fun runTestsWith (allTests: tcase list) (cmdLineOptions: string list) : unit =
-    let
-      val opts as {verbose,filter,exclude,progress}
-        = parseArgs cmdLineOptions
-      fun reject f l = List.filter (not o f) l
-      val filteredTests =
-          if (null filter)
-          then allTests
-          else List.filter (fn (TC (name,_)) =>
-                               List.exists (fn f => String.isSubstring f name) filter)
-                           allTests
-      val tests =
-          if (null exclude)
-          then filteredTests
-          else reject (fn (TC (name,_)) =>
-                          List.exists (fn f => String.isSubstring f name) exclude)
-                      filteredTests
-      val results = map (if verbose
-                         then runTestVerbose
-                         else if progress
-                         then runTestProgress
-                         else runTest) tests
-      val errors = List.filter (fn (_, n) => not n) results
-      val successes = List.filter (fn (_, n) => n) results
-      val error_count = length errors
-      val test_count = length results
-      val p = fn s => ignore(print (s ^"\n"))
-      val i = Int.toString
-      val error_ratio = concat [i error_count, "/", i test_count]
-      val success_ratio = concat [i test_count, "/", i test_count]
-    in
-      if error_count = 0
-      then (p "";
-            if verbose then app (p o #1) successes else ();
-            p ("ALL TESTS PASSED: " ^ success_ratio))
-      else (p "";
-            if verbose then app (p o #1) successes else ();
-            app (p o #1) errors;
-            p ("\nTESTS FAILED: " ^ error_ratio ^ "\n");
-            OS.Process.exit(OS.Process.failure))
-    end
+  let
+    val opts as {verbose,filter,exclude,progress}
+      = parseArgs cmdLineOptions
+    fun reject f l = List.filter (not o f) l
+    val filteredTests =
+      if (null filter)
+      then allTests
+      else List.filter (fn (TC (name,_)) =>
+                           List.exists (fn f => String.isSubstring f name) filter)
+                       allTests
+    val tests =
+      if (null exclude)
+      then filteredTests
+      else reject (fn (TC (name,_)) =>
+                      List.exists (fn f => String.isSubstring f name) exclude)
+                  filteredTests
+    val results = map (if verbose
+                       then runTestVerbose
+                       else if progress
+                       then runTestProgress
+                       else runTest) tests
+    val errors = List.filter (fn (_, n) => not n) results
+    val successes = List.filter (fn (_, n) => n) results
+    val error_count = length errors
+    val test_count = length results
+    val p = fn s => ignore(print (s ^"\n"))
+    val i = Int.toString
+    val error_ratio = concat [i error_count, "/", i test_count]
+    val success_ratio = concat [i test_count, "/", i test_count]
+  in
+    if error_count = 0
+    then (p "";
+          if verbose then app (p o #1) successes else ();
+          p ("ALL TESTS PASSED: " ^ success_ratio))
+    else (p "";
+          if verbose then app (p o #1) successes else ();
+          app (p o #1) errors;
+          p ("\nTESTS FAILED: " ^ error_ratio ^ "\n");
+          OS.Process.exit(OS.Process.failure))
+  end
 
 fun runTests tests = runTestsWith tests (CommandLine.arguments())
 

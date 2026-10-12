@@ -1,2 +1,7 @@
 open Assert;
-infixr 1 == != =/= =?=;
+infixr 2 == ===
+infixr 2 =/= =//=
+infixr 2 =?= =??=
+infixr 2 !=
+
+
