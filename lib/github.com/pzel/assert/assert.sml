@@ -14,10 +14,13 @@ signature ASSERT = sig
   val ==  : (''a * ''a)             -> assertion
   val === : (''a * ''a) -> ''a show -> assertion
   val eq  : ''a show -> (''a * ''a) -> assertion
+  val equal : ('a * 'a -> bool) -> ('a show) -> ('a * 'a) -> assertion
+
 
   val =/=  : (''a * ''a)             -> assertion
   val =//= : (''a * ''a) -> ''a show -> assertion
   val neq  : ''a show -> (''a * ''a) -> assertion
+  val unequal : ('a * 'a -> bool) -> ('a show) -> ('a * 'a) -> assertion
 
   val != : (exn * (unit -> 'z))      -> assertion
 
@@ -43,7 +46,6 @@ infixr 2 == ===
 infixr 2 =/= =//=
 infixr 2 =?= =??=
 infixr 2 !=
-
 
 fun return (a: 'a) : assertion = RAISES (ignore a)
 
@@ -71,6 +73,16 @@ fun eq show (left : ''a, right: ''a) : assertion =
 
 fun neq show (left : ''a, right: ''a) : assertion =
   return (if left = right
+          then raise TestErr (show left, show right)
+          else raise TestOK (show left, show right))
+
+fun equal check show (left : 'a, right: 'a) : assertion =
+  return (if not (check(left,right))
+          then raise TestErr (show left, show right)
+          else raise TestOK (show left, show right))
+
+fun unequal check show (left : 'a, right: 'a) : assertion =
+  return (if check(left,right)
           then raise TestErr (show left, show right)
           else raise TestOK (show left, show right))
 

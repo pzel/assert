@@ -2,6 +2,19 @@ exception TestExn of string;
 
 fun identity a = a;
 
+structure Opaque = struct
+datatype t = T of real
+val x : t = T 0.0
+val y : t = T 1.0
+fun op == (T a, T b) = Real.==(a,b)
+fun toString (T a) = "T "^Real.toString a
+end : sig type t
+          val x : t
+          val y : t
+          val == : (t * t) -> bool
+          val toString : t -> string
+      end;
+
 val passingTests = [
   It "asserts on int equality" (fn()=> 3 + 3 == 6),
   It "asserts on int inequality" (fn()=> 3 + 3 =/= 7),
@@ -32,8 +45,15 @@ val explicitShowPassingTests = [
              end),
   It "can === with a specific printer (int)" (
     fn()=> (3+3 === 6) Int.toString),
+
   It "can =//= with a specific printer (int)" (
-    fn()=> (3+3 =//= 33) Int.toString)
+    fn()=> (3+3 =//= 33) Int.toString),
+
+  It "can assert with a specific equality check and printer (int ref)" (
+    fn()=> Assert.equal Opaque.== Opaque.toString (Opaque.x, Opaque.x)),
+
+  It "can assert with a specific unequality check and printer (int ref)" (
+    fn()=> Assert.unequal Opaque.== Opaque.toString (Opaque.x, Opaque.y))
 ]
 
 val failingTests = [
@@ -41,6 +61,10 @@ val failingTests = [
   It "fails int inequality when equal" (fn()=> 2 + 2 =/= 4),
   It "fails record inequality when values differ" (fn()=> {a = "a", b=2} == {a = "A", b=2}),
   It "can fail explicitly" (fn()=> fail "not good"),
+  It "can fail assertion with a specific equality check and printer (int ref)" (
+    fn()=> Assert.equal Opaque.== Opaque.toString (Opaque.x, Opaque.y)),
+  It "can fail assertion with a specific unequality check and printer (int ref)" (
+    fn()=> Assert.unequal Opaque.== Opaque.toString (Opaque.x, Opaque.x)),
   It "a failing assertion anywhere in the fun body fails the test" (
     fn()=>
        let val x = 2 =?= 2 + 0

@@ -18,10 +18,12 @@ signature ASSERT = sig
   val ==  : (''a * ''a)             -> assertion
   val === : (''a * ''a) -> ''a show -> assertion
   val eq  : ''a show -> (''a * ''a) -> assertion
+  val equal : ('a * 'a -> bool) -> ('a show) -> ('a * 'a) -> assertion
 
   val =/=  : (''a * ''a)             -> assertion
   val =//= : (''a * ''a) -> ''a show -> assertion
   val neq  : ''a show -> (''a * ''a) -> assertion
+  val unequal : ('a * 'a -> bool) -> ('a show) -> ('a * 'a) -> assertion
 
   val != : (exn * (unit -> 'z))      -> assertion
 
