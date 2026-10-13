@@ -44,11 +44,20 @@ val failingTests = [
   It "a failing assertion anywhere in the fun body fails the test" (
     fn()=>
        let val x = 2 =?= 2 + 0
-           val y = (30 =??= x + 1) "y is not equal"
+           val y = (30 =??= x + 1) (fn _ => "y is not equal")
        in
          x + y == hd [] (* will not be evaluated,
                            the test fails at (30 =?= ...) *)
        end),
+  It "a failing assertion prints anywhere in the fun body fails the test" (
+    fn()=>
+       let val x = 2 =?= 2 + 0
+           val y = (30 =??= x + 1) Int.toString
+       in
+         x + y == hd [] (* will not be evaluated,
+                           the test fails at (30 =?= ...) *)
+       end),
+
   It "an exeption raised during eval results in a failed test" (
     fn()=>
        let val x = hd ([] : int list) in x + 2 == 3 end),

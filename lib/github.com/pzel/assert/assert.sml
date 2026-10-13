@@ -22,7 +22,7 @@ signature ASSERT = sig
   val != : (exn * (unit -> 'z))      -> assertion
 
   val =?= : (''a * ''a) -> ''a
-  val =??= : (''a * ''a) -> string -> ''a
+  val =??= : (''a * ''a) -> ''a show -> ''a
 
   val runTest : tcase -> testresult
   val runTests : tcase list -> unit
@@ -103,13 +103,13 @@ fun (expected : exn) != (f : (unit -> 'z)) : assertion =
 
 
 fun (left : ''a) =??= (right: ''a) =
-  fn msg =>
+  fn show =>
      if left = right
      then left
-     else raise (TestErr ("Assertion failed:", msg))
+     else raise (TestErr ("=??= "^ show left, "=??= "^show right))
 
 fun (left : ''a) =?= (right : ''a) : ''a =
-  ((left =??= right) "~values not equal~")
+  ((left =??= right) (fn _ => "~values not equal~"))
 
 fun runTest ((TC (desc,f)) : tcase) : testresult =
   let fun fmt (result, data) =

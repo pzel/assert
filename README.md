@@ -26,7 +26,7 @@ signature ASSERT = sig
   val != : (exn * (unit -> 'z))      -> assertion
 
   val =?= : (''a * ''a) -> ''a
-  val =??= : (''a * ''a) -> string -> ''a
+  val =??= : (''a * ''a) -> (''a show) -> ''a
 
   val runTest : tcase -> testresult
   val runTests : tcase list -> unit
